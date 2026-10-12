@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local databases and logs
+library.db
+*.db-journal
+*.sqlite3
+*.log
+
+# Environment and tools
+.env
+.coverage
+htmlcov/
+.idea/
+.vscode/

@@ -1,0 +1,127 @@
+# CI for the Library API (Django + DRF).
+# 1. unit:        install, check the migrations are up to date, run the service unit tests
+# 2. conformance: on PostgreSQL and on SQLite, run the unit tests, start the API in TEST_MODE, run the contract suite
+# 3. docker:      build the image
+
+# name: the workflow's title on the Actions tab.
+name: CI
+
+# on: the events that start the workflow.
+on:
+  # push: every push to any branch.
+  push:
+  # pull_request: every pull request.
+  pull_request:
+
+# permissions: what the workflow's token may do. Reading the code is enough.
+permissions:
+  contents: read
+
+# jobs: the work, as separate jobs that run on fresh machines.
+jobs:
+  unit:
+    # runs-on: the kind of machine for the job.
+    runs-on: ubuntu-latest
+    # steps: the commands, run in order.
+    steps:
+      # uses: run a published action. checkout fetches this repository.
+      - uses: actions/checkout@v5
+
+      # with: inputs for the action.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      # name: the step's title in the log. run: shell commands.
+      - name: Install the packages
+        run: pip install -r requirements.txt
+
+      - name: Migrations match the models
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Unit tests (service layer, SQLite)
+        run: python manage.py test tests.unit -v 2
+
+  conformance:
+    # needs: only start when the unit job has passed.
+    needs: unit
+    runs-on: ubuntu-latest
+
+    # strategy.matrix: run this job once per entry, here once per database.
+    strategy:
+      # fail-fast: false lets the other database finish when one fails.
+      fail-fast: false
+      matrix:
+        include:
+          - database: postgresql
+            database_url: postgresql://library:library@localhost:5432/library
+          - database: sqlite
+            database_url: sqlite:///library.db
+
+    # services: containers that run beside the job. PostgreSQL 17 for the suite.
+    services:
+      postgres:
+        image: postgres:17
+        # env: environment variables for the container.
+        env:
+          POSTGRES_USER: library
+          POSTGRES_PASSWORD: library
+          POSTGRES_DB: library
+        # ports: publish the database on the runner.
+        ports:
+          - 5432:5432
+        # options: extra docker flags. Wait until PostgreSQL accepts connections.
+        options: >-
+          --health-cmd "pg_isready -U library -d library"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
+    # env at job level: every step sees these.
+    env:
+      PORT: "8000"
+      DATABASE_URL: ${{ matrix.database_url }}
+      TEST_MODE: "1"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out the contract
+        uses: actions/checkout@v5
+        with:
+          repository: devfoundry-training/Library_API_Contract
+          # path: where to put it, next to this repository's files.
+          path: contract
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install the packages
+        run: pip install -r requirements.txt
+
+      - name: Unit tests on this database
+        run: python manage.py test tests.unit --noinput
+
+      - name: Start the API (${{ matrix.database }})
+        # serve runs the migrations and loads the sample data before it listens.
+        run: |
+          nohup python manage.py serve > app.log 2>&1 &
+          for _ in $(seq 1 60); do curl -fs http://localhost:8000/health && break; sleep 1; done
+
+      - name: Conformance suite (${{ matrix.database }})
+        run: python contract/conformance/run.py --base-url http://localhost:8000
+
+      - name: Server log
+        # if: run this step only when an earlier step failed.
+        if: failure()
+        run: cat app.log
+
+  docker:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the image
+        run: docker build -t library-api-django .
