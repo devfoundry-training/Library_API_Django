@@ -1,5 +1,7 @@
 # Library API: Django
 
+[![CI](https://github.com/devfoundry-training/Library_API_Django/actions/workflows/ci.yml/badge.svg)](https://github.com/devfoundry-training/Library_API_Django/actions/workflows/ci.yml)
+
 The Library API built with Django 5.2 and Django REST framework, with the Django ORM and migrations, SQLite on a
 laptop and PostgreSQL 17 in Docker Compose. Part of the DevFoundry Library API series: one REST API built the same
 way in several stacks, all checked by the same conformance suite from

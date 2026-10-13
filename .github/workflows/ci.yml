@@ -25,10 +25,10 @@ jobs:
     # steps: the commands, run in order.
     steps:
       # uses: run a published action. checkout fetches this repository.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # with: inputs for the action.
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -83,16 +83,16 @@ jobs:
       TEST_MODE: "1"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Check out the contract
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: devfoundry-training/Library_API_Contract
           # path: where to put it, next to this repository's files.
           path: contract
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -121,7 +121,7 @@ jobs:
     needs: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Build the image
         run: docker build -t library-api-django .
